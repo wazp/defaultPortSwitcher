@@ -44,7 +44,7 @@ namespace defaultPortSwitcher
                 menuItem.Header = site.Name.ToString();
                 foreach (Binding binding in bindings)
                 {
-                    if (binding.BindingInformation == "*:80:")
+                    if (binding.BindingInformation == "*:80:" || binding.BindingInformation == "*:443:")
                     {
                         // replace with bitmap later on, but who cares now?!
                         menuItem.Icon = "  >";
