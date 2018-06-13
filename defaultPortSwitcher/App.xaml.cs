@@ -20,6 +20,7 @@ namespace defaultPortSwitcher
         private TaskbarIcon notifyIcon;
         private ServerManager iisManager;
         private ContextMenu contextMenu;
+        private Site currentSite;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -39,18 +40,16 @@ namespace defaultPortSwitcher
             contextMenu.Items.Clear();
             foreach (Site site in iisManager.Sites)
             {
-                BindingCollection bindings = site.Bindings;
                 MenuItem menuItem = new MenuItem();
                 menuItem.Header = site.Name.ToString();
-                foreach (Binding binding in bindings)
+
+                if(site.State == ObjectState.Started)
                 {
-                    if (binding.BindingInformation == "*:80:" || binding.BindingInformation == "*:443:")
-                    {
-                        // replace with bitmap later on, but who cares now?!
-                        menuItem.Icon = "  >";
-                        break; // also, break out of the foreach
-                    }
+                    currentSite = site;
+                    // replace with bitmap later on, but who cares now?!
+                    menuItem.Icon = "  >";
                 }
+
                 menuItem.Click += MenuItem_Click;
                 contextMenu.Items.Add(menuItem);
             }
@@ -65,32 +64,27 @@ namespace defaultPortSwitcher
 
         private void MenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // loop through all sites and remove the current *:80: binding
-            foreach (Site site in iisManager.Sites)
-            {
-                BindingCollection bindings = site.Bindings;
-                Binding bindingToRemove = null;
-                foreach (Binding binding in bindings)
-                {
-                    if (binding.BindingInformation == "*:80:")
-                    {
-                        bindingToRemove = binding;
-                        break; // we know we only have one...
-                    }
-                }
-                if (bindingToRemove != null)
-                {
-                    bindingToRemove.Delete(); // remove the old binding
-                    bindings.Remove(bindingToRemove); // remove it from the current BindingCollection
-                    iisManager.CommitChanges(); // commit the changes to iis
-                    break; // and also break out of this foreach...
-                }
-            }
+            // TODO: We should maybe stop and start app pools associated with the sites as well!
 
-            // add a new *:80: binding to the chosen site
-            Site siteToChange = iisManager.Sites.FirstOrDefault(s => s.Name == (string)((HeaderedItemsControl)sender).Header);
-            siteToChange.Bindings.Add("*:80:", "http");
+            // stop the currently running site
+            ApplicationPool currentAppPool = getAppPool(currentSite);
+            currentAppPool.Stop();
+            currentSite.Stop();
+
+            // find the currently selected site and start it.
+            Site siteToStart = iisManager.Sites.FirstOrDefault(s => s.Name == (string)((HeaderedItemsControl)sender).Header);
+            ApplicationPool appPool = getAppPool(siteToStart);
+            appPool.Start();
+            appPool.
+            siteToStart.Start();
             iisManager.CommitChanges();
+        }
+
+        private ApplicationPool getAppPool (Site site)
+        {
+            string appPoolName = site.Applications[0].ApplicationPoolName;
+            ApplicationPool appPool = iisManager.ApplicationPools[appPoolName];
+            return appPool;
         }
 
         protected override void OnExit(ExitEventArgs e)
